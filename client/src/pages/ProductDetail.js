@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProduct, addToCart } from '../api';
 import './ProductDetail.css';
@@ -13,11 +13,7 @@ function ProductDetail({ user, setCartCount }) {
   const [success, setSuccess] = useState('');
   const [addingToCart, setAddingToCart] = useState(false);
 
-  useEffect(() => {
-    fetchProduct();
-  }, [id]);
-
-  const fetchProduct = async () => {
+  const fetchProduct = useCallback(async () => {
     try {
       const response = await getProduct(id);
       setProduct(response.data);
@@ -26,7 +22,11 @@ function ProductDetail({ user, setCartCount }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchProduct();
+  }, [fetchProduct]);
 
   const handleAddToCart = async () => {
     if (!user) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCart, updateCartItem, removeFromCart, createOrder } from '../api';
 import './Cart.css';
@@ -10,11 +10,7 @@ function Cart({ setCartCount }) {
   const [placingOrder, setPlacingOrder] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchCart();
-  }, []);
-
-  const fetchCart = async () => {
+  const fetchCart = useCallback(async () => {
     try {
       const response = await getCart();
       setCartItems(response.data);
@@ -24,7 +20,11 @@ function Cart({ setCartCount }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setCartCount]);
+
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
 
   const handleUpdateQuantity = async (itemId, newQuantity) => {
     if (newQuantity < 1) return;
