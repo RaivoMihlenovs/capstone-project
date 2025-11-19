@@ -8,6 +8,17 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const formatCurrencyShort = (value) => {
+    const num = parseFloat(value);
+    if (num >= 1000000) {
+      return `$${(num / 1000000).toFixed(1)}mil`;
+    } else if (num >= 1000) {
+      return `$${(num / 1000).toFixed(0)}k`;
+    } else {
+      return `$${num.toFixed(2)}`;
+    }
+  };
+
   useEffect(() => {
     fetchStats();
   }, []);
@@ -61,7 +72,7 @@ function AdminDashboard() {
             <div className="stat-icon">💰</div>
             <div className="stat-info">
               <h3>Total Revenue</h3>
-              <p className="stat-value">${parseFloat(stats.total_revenue).toFixed(2)}</p>
+              <p className="stat-value">{formatCurrencyShort(stats.total_revenue)}</p>
             </div>
           </div>
         </div>

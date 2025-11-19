@@ -7,7 +7,7 @@ function ProductDetail({ user, setCartCount }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState('1');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -38,10 +38,18 @@ function ProductDetail({ user, setCartCount }) {
     setError('');
     setSuccess('');
 
+    const qty = parseInt(quantity);
+    if (isNaN(qty) || qty < 1 || qty > product.stock) {
+      setError(`Please enter a valid quantity between 1 and ${product.stock}`);
+      setAddingToCart(false);
+      return;
+    }
+
     try {
-      await addToCart({ product_id: product.id, quantity });
+      await addToCart({ product_id: product.id, quantity: qty });
       setSuccess('Added to cart!');
-      setCartCount(prev => prev + quantity);
+      setCartCount(prev => prev + qty);
+      setQuantity(qty.toString());
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to add to cart');
@@ -91,11 +99,13 @@ function ProductDetail({ user, setCartCount }) {
               <div className="quantity-selector">
                 <label>Quantity:</label>
                 <input
-                  type="number"
-                  min="1"
-                  max={product.stock}
+                  type="text"
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Math.min(product.stock, parseInt(e.target.value) || 1)))}
+                  onChange={(e) => {
+                    if (/^\d*$/.test(e.target.value)) {
+                      setQuantity(e.target.value);
+                    }
+                  }}
                 />
               </div>
 

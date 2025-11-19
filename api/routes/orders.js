@@ -4,6 +4,34 @@ const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Function to update stats
+const updateStats = async () => {
+  try {
+    const stats = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM products) as total_products,
+        (SELECT COUNT(*) FROM orders) as total_orders,
+        (SELECT COUNT(*) FROM users WHERE is_admin = false) as total_customers,
+        (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'Canceled') as total_revenue
+    `);
+
+    const statData = stats.rows[0];
+
+    await pool.query(`
+      INSERT INTO stats (id, total_products, total_orders, total_customers, total_revenue)
+      VALUES (1, $1, $2, $3, $4)
+      ON CONFLICT (id) DO UPDATE SET
+        total_products = EXCLUDED.total_products,
+        total_orders = EXCLUDED.total_orders,
+        total_customers = EXCLUDED.total_customers,
+        total_revenue = EXCLUDED.total_revenue,
+        updated_at = CURRENT_TIMESTAMP
+    `, [statData.total_products, statData.total_orders, statData.total_customers, statData.total_revenue]);
+  } catch (err) {
+    console.error('Error updating stats:', err);
+  }
+};
+
 // Get user's orders
 router.get('/', authMiddleware, async (req, res) => {
   try {
@@ -116,9 +144,12 @@ router.post('/', authMiddleware, async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Update stats
+    await updateStats();
+
     // Fetch complete order with items
     const completeOrder = await pool.query(`
-      SELECT o.*, 
+      SELECT o.*,
         json_agg(json_build_object(
           'product_id', oi.product_id,
           'quantity', oi.quantity,

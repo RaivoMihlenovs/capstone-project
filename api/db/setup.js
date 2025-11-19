@@ -56,6 +56,15 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, product_id)
       );
+
+      CREATE TABLE IF NOT EXISTS stats (
+        id SERIAL PRIMARY KEY,
+        total_products INTEGER DEFAULT 0,
+        total_orders INTEGER DEFAULT 0,
+        total_customers INTEGER DEFAULT 0,
+        total_revenue DECIMAL(10, 2) DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
     console.log('Database tables created successfully');
   } catch (err) {

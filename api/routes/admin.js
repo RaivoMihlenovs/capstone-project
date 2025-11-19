@@ -7,6 +7,34 @@ const router = express.Router();
 // All routes require authentication and admin access
 router.use(authMiddleware, adminMiddleware);
 
+// Function to update stats
+const updateStats = async () => {
+  try {
+    const stats = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM products) as total_products,
+        (SELECT COUNT(*) FROM orders) as total_orders,
+        (SELECT COUNT(*) FROM users WHERE is_admin = false) as total_customers,
+        (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'Canceled') as total_revenue
+    `);
+
+    const statData = stats.rows[0];
+
+    await pool.query(`
+      INSERT INTO stats (id, total_products, total_orders, total_customers, total_revenue)
+      VALUES (1, $1, $2, $3, $4)
+      ON CONFLICT (id) DO UPDATE SET
+        total_products = EXCLUDED.total_products,
+        total_orders = EXCLUDED.total_orders,
+        total_customers = EXCLUDED.total_customers,
+        total_revenue = EXCLUDED.total_revenue,
+        updated_at = CURRENT_TIMESTAMP
+    `, [statData.total_products, statData.total_orders, statData.total_customers, statData.total_revenue]);
+  } catch (err) {
+    console.error('Error updating stats:', err);
+  }
+};
+
 // Create product
 router.post('/products', async (req, res) => {
   const { name, description, price, stock, image_url, category } = req.body;
@@ -16,6 +44,9 @@ router.post('/products', async (req, res) => {
       'INSERT INTO products (name, description, price, stock, image_url, category) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [name, description, price, stock, image_url, category]
     );
+
+    // Update stats
+    await updateStats();
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -54,6 +85,9 @@ router.delete('/products/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
+
+    // Update stats
+    await updateStats();
 
     res.json({ message: 'Product deleted successfully' });
   } catch (err) {
@@ -105,6 +139,9 @@ router.put('/orders/:id/status', async (req, res) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
+    // Update stats
+    await updateStats();
+
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -114,15 +151,29 @@ router.put('/orders/:id/status', async (req, res) => {
 // Get dashboard stats
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await pool.query(`
-      SELECT 
+    // Always calculate and save latest stats
+    const calculated = await pool.query(`
+      SELECT
         (SELECT COUNT(*) FROM products) as total_products,
         (SELECT COUNT(*) FROM orders) as total_orders,
         (SELECT COUNT(*) FROM users WHERE is_admin = false) as total_customers,
         (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'Canceled') as total_revenue
     `);
 
-    res.json(stats.rows[0]);
+    const statData = calculated.rows[0];
+
+    await pool.query(`
+      INSERT INTO stats (id, total_products, total_orders, total_customers, total_revenue)
+      VALUES (1, $1, $2, $3, $4)
+      ON CONFLICT (id) DO UPDATE SET
+        total_products = EXCLUDED.total_products,
+        total_orders = EXCLUDED.total_orders,
+        total_customers = EXCLUDED.total_customers,
+        total_revenue = EXCLUDED.total_revenue,
+        updated_at = CURRENT_TIMESTAMP
+    `, [statData.total_products, statData.total_orders, statData.total_customers, statData.total_revenue]);
+
+    res.json(statData);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }

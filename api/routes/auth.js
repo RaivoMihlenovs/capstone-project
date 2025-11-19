@@ -5,13 +5,41 @@ const { pool } = require('../db/setup');
 
 const router = express.Router();
 
+// Function to update stats
+const updateStats = async () => {
+  try {
+    const stats = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM products) as total_products,
+        (SELECT COUNT(*) FROM orders) as total_orders,
+        (SELECT COUNT(*) FROM users WHERE is_admin = false) as total_customers,
+        (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'Canceled') as total_revenue
+    `);
+
+    const statData = stats.rows[0];
+
+    await pool.query(`
+      INSERT INTO stats (id, total_products, total_orders, total_customers, total_revenue)
+      VALUES (1, $1, $2, $3, $4)
+      ON CONFLICT (id) DO UPDATE SET
+        total_products = EXCLUDED.total_products,
+        total_orders = EXCLUDED.total_orders,
+        total_customers = EXCLUDED.total_customers,
+        total_revenue = EXCLUDED.total_revenue,
+        updated_at = CURRENT_TIMESTAMP
+    `, [statData.total_products, statData.total_orders, statData.total_customers, statData.total_revenue]);
+  } catch (err) {
+    console.error('Error updating stats:', err);
+  }
+};
+
 // Register
 router.post('/register', async (req, res) => {
   const { email, password, name } = req.body;
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     const result = await pool.query(
       'INSERT INTO users (email, password, name) VALUES ($1, $2, $3) RETURNING id, email, name, is_admin',
       [email, hashedPassword, name]
@@ -23,6 +51,9 @@ router.post('/register', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    // Update stats
+    await updateStats();
 
     res.status(201).json({ user, token });
   } catch (err) {
