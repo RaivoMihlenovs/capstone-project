@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../db/setup');
 const { authMiddleware } = require('../middleware/auth');
+const { validateCartItem } = require('../validation');
 
 const router = express.Router();
 
@@ -22,9 +23,10 @@ router.get('/', authMiddleware, async (req, res) => {
 
 // Add to cart
 router.post('/', authMiddleware, async (req, res) => {
-  const { product_id, quantity } = req.body;
-
   try {
+    // Validate and sanitize input
+    const validatedData = validateCartItem(req.body);
+    const { product_id, quantity } = validatedData;
     const result = await pool.query(`
       INSERT INTO cart_items (user_id, product_id, quantity)
       VALUES ($1, $2, $3)
@@ -35,15 +37,16 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(400).json({ error: err.message });
   }
 });
 
 // Update cart item
 router.put('/:id', authMiddleware, async (req, res) => {
-  const { quantity } = req.body;
-
   try {
+    // Validate quantity
+    const validatedData = { quantity: req.body.quantity };
+    const { quantity } = validateCartItem(validatedData);
     const result = await pool.query(
       'UPDATE cart_items SET quantity = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
       [quantity, req.params.id, req.user.userId]
@@ -55,7 +58,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(400).json({ error: err.message });
   }
 });
 

@@ -2,6 +2,8 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db/setup');
+const { authMiddleware } = require('../middleware/auth');
+const { validateUserRegistration, validateUserLogin } = require('../validation');
 
 const router = express.Router();
 
@@ -35,9 +37,10 @@ const updateStats = async () => {
 
 // Register
 router.post('/register', async (req, res) => {
-  const { email, password, name } = req.body;
-
   try {
+    // Validate and sanitize input
+    const validatedData = validateUserRegistration(req.body);
+    const { email, password, name } = validatedData;
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
@@ -60,16 +63,18 @@ router.post('/register', async (req, res) => {
     if (err.code === '23505') {
       res.status(400).json({ error: 'Email already exists' });
     } else {
-      res.status(500).json({ error: 'Server error' });
+      // Handle validation errors
+      res.status(400).json({ error: err.message });
     }
   }
 });
 
 // Login
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    // Validate and sanitize input
+    const validatedData = validateUserLogin(req.body);
+    const { email, password } = validatedData;
     const result = await pool.query(
       'SELECT * FROM users WHERE email = $1',
       [email]
@@ -93,6 +98,42 @@ router.post('/login', async (req, res) => {
     );
 
     res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        is_admin: user.is_admin
+      },
+      token
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Become admin (for testing purposes only)
+router.post('/become-admin', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE users SET is_admin = true WHERE id = $1 RETURNING id, email, name, is_admin',
+      [req.user.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.rows[0];
+
+    // Generate new token with updated admin status
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, is_admin: user.is_admin },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      message: 'Successfully became admin!',
       user: {
         id: user.id,
         email: user.email,

@@ -39,10 +39,15 @@ function App() {
     setCartCount(0);
   };
 
+  const handleUserUpdate = (userData) => {
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
   return (
     <Router>
       <div className="App">
-        <Navbar user={user} onLogout={handleLogout} cartCount={cartCount} />
+        <Navbar user={user} onLogout={handleLogout} onUserUpdate={handleUserUpdate} cartCount={cartCount} />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />} />

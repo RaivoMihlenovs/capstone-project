@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../db/setup');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const { validateProductData } = require('../validation');
 
 const router = express.Router();
 
@@ -37,9 +38,10 @@ const updateStats = async () => {
 
 // Create product
 router.post('/products', async (req, res) => {
-  const { name, description, price, stock, image_url, category } = req.body;
-
   try {
+    // Validate and sanitize input
+    const validatedData = validateProductData(req.body);
+    const { name, description, price, stock, image_url, category } = validatedData;
     const result = await pool.query(
       'INSERT INTO products (name, description, price, stock, image_url, category) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [name, description, price, stock, image_url, category]
@@ -50,15 +52,16 @@ router.post('/products', async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(400).json({ error: err.message });
   }
 });
 
 // Update product
 router.put('/products/:id', async (req, res) => {
-  const { name, description, price, stock, image_url, category } = req.body;
-
   try {
+    // Validate and sanitize input
+    const validatedData = validateProductData(req.body);
+    const { name, description, price, stock, image_url, category } = validatedData;
     const result = await pool.query(
       'UPDATE products SET name = $1, description = $2, price = $3, stock = $4, image_url = $5, category = $6 WHERE id = $7 RETURNING *',
       [name, description, price, stock, image_url, category, req.params.id]
@@ -70,7 +73,7 @@ router.put('/products/:id', async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(400).json({ error: err.message });
   }
 });
 
