@@ -1,9 +1,9 @@
-To setup locally:
+# To setup locally:
 npm install
 cd client
 npm install
 
-setup a postgresql database:
+# Setup a postgresql database:
 create a .env file in the root directory
 # Database Configuration
 DATABASE_URL=postgresql://username:password@localhost:5432/ecommerce_capstone
@@ -14,7 +14,7 @@ JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 # Server Port (optional, defaults to 3001)
 PORT=3001
 
-to run after setup:
+# To run after setup:
 npm run dev
 cd client
 npm start
